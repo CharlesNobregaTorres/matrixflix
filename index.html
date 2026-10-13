@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CineFlix - Streaming & Trailers</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        netflix: { red: '#E50914', darkred: '#B20710', black: '#141414', gray: '#1F1F1F', lightgray: '#2B2B2B' }
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #141414; }
+        ::-webkit-scrollbar-thumb { background: #2B2B2B; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #E50914; }
+        .hero-gradient { background: linear-gradient(180deg, rgba(20,20,20,0) 0%, rgba(20,20,20,0.85) 60%, rgba(20,20,20,1) 100%), linear-gradient(90deg, rgba(20,20,20,0.95) 0%, rgba(20,20,20,0.5) 50%, rgba(20,20,20,0.1) 100%); }
+        .glass-panel { background: rgba(20, 20, 20, 0.95); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .movie-card { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .movie-card:hover { transform: translateY(-8px) scale(1.03); box-shadow: 0 20px 30px -10px rgba(229, 9, 20, 0.3); }
+    </style>
+</head>
+<body class="bg-netflix-black text-gray-100 font-sans min-h-screen selection:bg-netflix-red selection:text-white">
+
+    <!-- Auth Overlay -->
+    <div id="auth-overlay" class="fixed inset-0 z-50 flex items-center justify-center bg-black/95 px-4 overflow-y-auto py-10">
+        <div class="absolute inset-0 bg-cover bg-center opacity-30 pointer-events-none" style="background-image: url('https://image.tmdb.org/t/p/original/rOMLLucpZ2y62Q31D56p3g2t0p7.jpg');"></div>
+        <div class="glass-panel rounded-2xl max-w-md w-full p-8 relative shadow-2xl border border-gray-800 space-y-6 z-10 my-auto">
+            <div class="text-center space-y-2">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-netflix-red/20 text-netflix-red mb-2 text-3xl">
+                    <i class="fa-solid fa-play"></i>
+                </div>
+                <h2 class="text-3xl font-black text-white tracking-wider uppercase">CineFlix</h2>
+                <p class="text-xs text-gray-400">Insira suas credenciais ou gere um acesso temporário de 1 hora.</p>
+            </div>
+            
+            <form id="login-form" class="space-y-4">
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-gray-300 uppercase tracking-wider">Usuário</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-400"><i class="fa-solid fa-user"></i></span>
+                        <input type="text" id="username-input" placeholder="Ex: admin" required class="w-full bg-netflix-gray text-white placeholder-gray-500 pl-10 pr-4 py-3 rounded-xl border border-gray-700 focus:outline-none focus:border-netflix-red text-sm transition">
+                    </div>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-gray-300 uppercase tracking-wider">Senha de Acesso</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-400"><i class="fa-solid fa-lock"></i></span>
+                        <input type="password" id="password-input" placeholder="Ex: matrix93" required class="w-full bg-netflix-gray text-white placeholder-gray-500 pl-10 pr-4 py-3 rounded-xl border border-gray-700 focus:outline-none focus:border-netflix-red text-sm transition">
+                    </div>
+                </div>
+
+                <div id="login-error" class="text-xs text-netflix-red font-medium hidden">
+                    <i class="fa-solid fa-circle-exclamation mr-1"></i> Usuário ou senha incorretos / expirados.
+                </div>
+
+                <button type="submit" class="w-full bg-netflix-red hover:bg-netflix-darkred text-white font-bold py-3.5 rounded-xl transition shadow-lg hover:shadow-netflix-red/50 text-sm tracking-wide">
+                    Entrar no Streaming
+                </button>
+            </form>
+
+            <div class="border-t border-gray-800 pt-4 space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-gray-300 uppercase tracking-wider">Gerador 1 Hora</span>
+                    <button type="button" onclick="generateTemporaryAccess()" class="bg-gray-800 hover:bg-gray-700 text-netflix-red text-xs font-bold px-3 py-1.5 rounded-lg border border-gray-700 transition flex items-center space-x-1.5">
+                        <i class="fa-solid fa-clock"></i>
+                        <span>Gerar Acesso 1h</span>
+                    </button>
+                </div>
+                <div id="temp-credentials-box" class="hidden bg-black/60 p-3 rounded-xl border border-netflix-red/30 text-xs space-y-1 text-gray-300">
+                    <p class="text-netflix-red font-bold">Acesso Temporário Gerado:</p>
+                    <p>Usuário: <span id="temp-user-out" class="text-white font-mono select-all"></span></p>
+                    <p>Senha: <span id="temp-pass-out" class="text-white font-mono select-all"></span></p>
+                    <p class="text-[10px] text-gray-400">Expira às <span id="temp-time-out"></span>.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header / Navbar -->
+    <header id="navbar" class="fixed top-0 left-0 right-0 z-40 transition-all duration-300 bg-gradient-to-b from-netflix-black/90 via-netflix-black/50 to-transparent py-4 px-6 md:px-12 flex items-center justify-between">
+        <div class="flex items-center space-x-8">
+            <a href="#" onclick="resetHome()" class="flex items-center space-x-2 text-2xl md:text-3xl font-extrabold text-netflix-red tracking-wider uppercase cursor-pointer">
+                <i class="fa-solid fa-play-circle text-netflix-red"></i>
+                <span>CineFlix</span>
+            </a>
+            <nav class="hidden md:flex items-center space-x-6 text-sm font-medium text-gray-300">
+                <a href="#" onclick="resetHome()" class="text-white hover:text-netflix-red transition">Início</a>
+                <a href="#catalog" onclick="fetchMoviesByTab('popular')" class="hover:text-netflix-red transition">Populares</a>
+                <a href="#catalog" onclick="fetchMoviesByTab('trending')" class="hover:text-netflix-red transition">Tendências</a>
+                <a href="#catalog" onclick="fetchMoviesByTab('action')" class="hover:text-netflix-red transition">Ação</a>
+            </nav>
+        </div>
+        <div class="flex items-center space-x-4">
+            <form id="search-form" class="relative flex items-center">
+                <input type="text" id="search-input" placeholder="Buscar filmes..." class="bg-netflix-gray/90 text-sm text-white placeholder-gray-400 px-4 py-2 pl-10 rounded-full border border-gray-700 focus:outline-none focus:border-netflix-red w-44 md:w-64 transition-all shadow-inner">
+                <button type="submit" class="absolute left-3 text-gray-400 hover:text-white"><i class="fa-solid fa-magnifying-glass"></i></button>
+            </form>
+            <button onclick="logout()" title="Sair da Conta" class="bg-netflix-gray hover:bg-netflix-lightgray text-gray-300 hover:text-white px-3 py-2 rounded-lg text-xs font-medium transition flex items-center space-x-1.5 border border-gray-700">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span class="hidden sm:inline">Sair</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section id="hero-section" class="relative w-full h-[85vh] md:h-[90vh] flex items-end pb-16 px-6 md:px-12 bg-cover bg-center transition-all duration-700" style="background-image: url('https://image.tmdb.org/t/p/original/rOMLLucpZ2y62Q31D56p3g2t0p7.jpg');">
+        <div class="absolute inset-0 hero-gradient"></div>
+        <div class="relative z-10 max-w-2xl space-y-4">
+            <div class="inline-flex items-center space-x-2 bg-netflix-red/20 border border-netflix-red/40 px-3 py-1 rounded-full text-xs font-semibold text-netflix-red uppercase tracking-wider">
+                <i class="fa-solid fa-fire"></i>
+                <span id="hero-badge">Destaque TMDB</span>
+            </div>
+            <h1 id="hero-title" class="text-4xl md:text-6xl font-black text-white tracking-tight drop-shadow-lg">Carregando...</h1>
+            <div class="flex items-center space-x-4 text-xs md:text-sm text-gray-300 font-medium">
+                <span id="hero-rating" class="bg-green-600/90 text-white px-2 py-0.5 rounded font-bold flex items-center space-x-1"><i class="fa-solid fa-star text-[10px]"></i> <span id="hero-rating-val">8.5</span></span>
+                <span id="hero-year">2026</span>
+                <span class="border border-gray-600 px-1.5 py-0.5 text-[10px] rounded uppercase">Full HD 1080p</span>
+            </div>
+            <p id="hero-overview" class="text-gray-300 text-sm md:text-base line-clamp-3 leading-relaxed drop-shadow">Explore milhares de filmes reais atualizados em tempo real.</p>
+            <div class="flex flex-wrap items-center gap-4 pt-2">
+                <button id="hero-play-btn" class="bg-netflix-red hover:bg-netflix-darkred text-white font-bold px-6 py-3 rounded-lg shadow-lg hover:shadow-netflix-red/50 transition transform hover:-translate-y-0.5 flex items-center space-x-2 text-sm md:text-base">
+                    <i class="fa-solid fa-play text-xs"></i>
+                    <span>Assistir Agora</span>
+                </button>
+                <button id="hero-details-btn" class="bg-netflix-gray/80 hover:bg-netflix-lightgray text-white font-semibold px-6 py-3 rounded-lg backdrop-blur border border-gray-700 transition flex items-center space-x-2 text-sm md:text-base">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <span>Mais Detalhes</span>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Player Section -->
+    <section id="player-section" class="hidden py-8 px-4 md:px-12 bg-netflix-black border-b border-gray-800 transition-all">
+        <div class="max-w-6xl mx-auto space-y-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <button onclick="closePlayer()" class="text-gray-400 hover:text-white bg-netflix-gray px-3.5 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-2 shadow">
+                        <i class="fa-solid fa-arrow-left"></i>
+                        <span>Voltar</span>
+                    </button>
+                    <h2 id="player-movie-title" class="text-xl md:text-2xl font-bold text-white truncate max-w-xs md:max-w-xl">Reproduzindo Filme</h2>
+                </div>
+            </div>
+            <div class="relative w-full rounded-2xl overflow-hidden shadow-2xl border border-gray-800 bg-black aspect-video">
+                <iframe id="embed-iframe" src="" allow="autoplay;encrypted-media;picture-in-picture" allowfullscreen frameborder="0" scrolling="no" class="w-full h-full"></iframe>
+            </div>
+        </div>
+    </section>
+
+    <!-- Catalog Section -->
+    <main id="catalog" class="max-w-7xl mx-auto px-6 md:px-12 py-12 space-y-8">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-800 pb-4">
+            <div>
+                <h2 id="catalog-heading" class="text-2xl md:text-3xl font-extrabold text-white tracking-tight flex items-center space-x-3">
+                    <span class="w-2 h-8 bg-netflix-red rounded-full inline-block"></span>
+                    <span id="catalog-title-text">Filmes Populares TMDB</span>
+                </h2>
+                <p id="catalog-subtext" class="text-gray-400 text-sm mt-1">Milhares de títulos atualizados em tempo real via API oficial.</p>
+            </div>
+            <div id="category-filters" class="flex flex-wrap gap-2">
+                <button onclick="fetchMoviesByTab('popular')" id="btn-tab-popular" class="category-btn bg-netflix-red text-white text-xs md:text-sm font-semibold px-4 py-2 rounded-lg transition shadow">Populares</button>
+                <button onclick="fetchMoviesByTab('trending')" id="btn-tab-trending" class="category-btn bg-netflix-gray hover:bg-netflix-lightgray text-gray-300 text-xs md:text-sm font-semibold px-4 py-2 rounded-lg transition">Tendências</button>
+                <button onclick="fetchMoviesByTab('action')" id="btn-tab-action" class="category-btn bg-netflix-gray hover:bg-netflix-lightgray text-gray-300 text-xs md:text-sm font-semibold px-4 py-2 rounded-lg transition">Ação</button>
+                <button onclick="fetchMoviesByTab('scifi')" id="btn-tab-scifi" class="category-btn bg-netflix-gray hover:bg-netflix-lightgray text-gray-300 text-xs md:text-sm font-semibold px-4 py-2 rounded-lg transition">Ficção</button>
+                <button onclick="fetchMoviesByTab('animation')" id="btn-tab-animation" class="category-btn bg-netflix-gray hover:bg-netflix-lightgray text-gray-300 text-xs md:text-sm font-semibold px-4 py-2 rounded-lg transition">Animação</button>
+            </div>
+        </div>
+
+        <div id="movies-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+            <div class="animate-pulse bg-netflix-gray rounded-xl h-72"></div>
+            <div class="animate-pulse bg-netflix-gray rounded-xl h-72"></div>
+            <div class="animate-pulse bg-netflix-gray rounded-xl h-72"></div>
+            <div class="animate-pulse bg-netflix-gray rounded-xl h-72"></div>
+            <div class="animate-pulse bg-netflix-gray rounded-xl h-72"></div>
+        </div>
+
+        <div id="pagination-container" class="flex items-center justify-center space-x-4 pt-8">
+            <button id="prev-page-btn" onclick="changePage(-1)" class="bg-netflix-gray hover:bg-netflix-lightgray text-white px-4 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2">
+                <i class="fa-solid fa-chevron-left text-xs"></i><span>Anterior</span>
+            </button>
+            <span id="page-indicator" class="text-sm font-medium text-gray-400">Página 1</span>
+            <button id="next-page-btn" onclick="changePage(1)" class="bg-netflix-red hover:bg-netflix-darkred text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center space-x-2 shadow">
+                <span>Próxima</span><i class="fa-solid fa-chevron-right text-xs"></i>
+            </button>
+        </div>
+    </main>
+
+    <!-- Details Modal -->
+    <div id="details-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md hidden">
+        <div class="glass-panel rounded-2xl max-w-2xl w-full p-6 md:p-8 relative border border-gray-700 shadow-2xl space-y-6">
+            <button onclick="closeMovieDetails()" class="absolute top-4 right-4 text-gray-400 hover:text-white bg-netflix-gray/80 w-10 h-10 rounded-full flex items-center justify-center transition"><i class="fa-solid fa-xmark text-lg"></i></button>
+            <div class="flex flex-col md:flex-row gap-6 items-start">
+                <img id="modal-poster" src="" alt="Poster" class="w-36 md:w-48 rounded-xl shadow-lg border border-gray-700 object-cover aspect-[2/3]">
+                <div class="space-y-3 flex-1">
+                    <h3 id="modal-title" class="text-2xl font-bold text-white">Título do Filme</h3>
+                    <div class="flex flex-wrap items-center gap-3 text-xs text-gray-300">
+                        <span id="modal-rating" class="bg-green-600 px-2 py-0.5 rounded font-bold flex items-center space-x-1"><i class="fa-solid fa-star text-[10px]"></i> <span id="modal-rating-val">8.0</span></span>
+                        <span id="modal-year">2026</span>
+                        <span id="modal-genres" class="bg-gray-800 px-2.5 py-0.5 rounded text-gray-300">Ação, Drama</span>
+                    </div>
+                    <p id="modal-overview" class="text-gray-300 text-sm leading-relaxed">Sinopse detalhada...</p>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-4 pt-4 border-t border-gray-700">
+                <button onclick="closeMovieDetails()" class="bg-netflix-gray hover:bg-netflix-lightgray text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition">Fechar</button>
+                <button id="modal-play-btn" class="bg-netflix-red hover:bg-netflix-darkred text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow-lg transition flex items-center space-x-2">
+                    <i class="fa-solid fa-play"></i><span>Assistir Agora</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script de Controle com Backend -->
+    <script>
+        const TMDB_API_KEY = '3fd2be6f0c70a2a598f084ddfb75487c';
+        const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+        const TMDB_IMG_BASE = 'https://image.tmdb.org/t/p/w500';
+        const TMDB_BACKDROP_BASE = 'https://image.tmdb.org/t/p/original';
+
+        let currentTab = 'popular';
+        let currentPage = 1;
+        let currentQuery = '';
+        let currentMoviesList = [];
+
+        window.onload = function() {
+            if (localStorage.getItem('cineflix_auth') === 'true') {
+                document.getElementById('auth-overlay').classList.add('hidden');
+                fetchMovies('popular', 1);
+            }
+
+            document.getElementById('login-form').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const username = document.getElementById('username-input').value.trim();
+                const password = document.getElementById('password-input').value.trim();
+                const errorEl = document.getElementById('login-error');
+
+                try {
+                    const response = await fetch('/api/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, password })
+                    });
+                    const data = await response.json();
+
+                    if (data.success) {
+                        localStorage.setItem('cineflix_auth', 'true');
+                        document.getElementById('auth-overlay').classList.add('hidden');
+                        errorEl.classList.add('hidden');
+                        fetchMovies('popular', 1);
+                    } else {
+                        errorEl.innerText = data.message;
+                        errorEl.classList.remove('hidden');
+                    }
+                } catch (err) {
+                    console.error("Erro no login:", err);
+                }
+            });
+
+            document.getElementById('search-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const query = document.getElementById('search-input').value.trim();
+                if (!query) return;
+                currentQuery = query;
+                currentPage = 1;
+                searchMovies(query, currentPage);
+            });
+        };
+
+        async function generateTemporaryAccess() {
+            try {
+                const response = await fetch('/api/generate', { method: 'POST' });
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('temp-user-out').innerText = data.username;
+                    document.getElementById('temp-pass-out').innerText = data.password;
+                    document.getElementById('temp-time-out').innerText = data.expiresAt;
+                    document.getElementById('temp-credentials-box').classList.remove('hidden');
+
+                    document.getElementById('username-input').value = data.username;
+                    document.getElementById('password-input').value = data.password;
+                }
+            } catch (err) {
+                console.error("Erro ao gerar acesso:", err);
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('cineflix_auth');
+            document.getElementById('auth-overlay').classList.remove('hidden');
+            document.getElementById('username-input').value = '';
+            document.getElementById('password-input').value = '';
+        }
+
+        function resetHome() {
+            currentQuery = '';
+            currentPage = 1;
+            document.getElementById('search-input').value = '';
+            fetchMovies('popular', 1);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function fetchMoviesByTab(tab) {
+            currentTab = tab;
+            currentQuery = '';
+            currentPage = 1;
+            document.getElementById('search-input').value = '';
+
+            document.querySelectorAll('.category-btn').forEach(btn => {
+                btn.className = 'category-btn bg-netflix-gray hover:bg-netflix-lightgray text-gray-300 text-xs md:text-sm font-semibold px-4 py-2 rounded-lg transition';
+            });
+            const activeBtn = document.getElementById(`btn-tab-${tab}`);
+            if (activeBtn) {
+                activeBtn.className = 'category-btn bg-netflix-red text-white text-xs md:text-sm font-semibold px-4 py-2 rounded-lg transition shadow';
+            }
+
+            let titleText = 'Filmes Populares TMDB';
+            if (tab === 'trending') titleText = 'Filmes em Tendência (Hoje)';
+            if (tab === 'action') titleText = 'Filmes de Ação';
+            if (tab === 'scifi') titleText = 'Filmes de Ficção Científica';
+            if (tab === 'animation') titleText = 'Filmes de Animação';
+
+            document.getElementById('catalog-title-text').innerText = titleText;
+            fetchMovies(tab, currentPage);
+        }
+
+        async function fetchMovies(category, page) {
+            let endpoint = `${TMDB_BASE_URL}/movie/popular?api_key=${TMDB_API_KEY}&language=pt-BR&page=${page}`;
+            if (category === 'trending') endpoint = `${TMDB_BASE_URL}/trending/movie/day?api_key=${TMDB_API_KEY}&language=pt-BR&page=${page}`;
+            else if (category === 'action') endpoint = `${TMDB_BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=28&language=pt-BR&page=${page}`;
+            else if (category === 'scifi') endpoint = `${TMDB_BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=878&language=pt-BR&page=${page}`;
+            else if (category === 'animation') endpoint = `${TMDB_BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=16&language=pt-BR&page=${page}`;
+
+            try {
+                const response = await fetch(endpoint);
+                const data = await response.json();
+                if (data.results && data.results.length > 0) {
+                    currentMoviesList = data.results;
+                    renderMoviesGrid(currentMoviesList);
+                    if (page === 1) setupHeroMovie(currentMoviesList[0]);
+                    updatePaginationUI(page);
+                }
+            } catch (error) { console.error("Erro ao carregar filmes:", error); }
+        }
+
+        async function searchMovies(query, page) {
+            const endpoint = `${TMDB_BASE_URL}/search/movie?api_key=${TMDB_API_KEY}&language=pt-BR&query=${encodeURIComponent(query)}&page=${page}`;
+            try {
+                const response = await fetch(endpoint);
+                const data = await response.json();
+                if (data.results) {
+                    currentMoviesList = data.results;
+                    renderMoviesGrid(currentMoviesList);
+                    document.getElementById('catalog-title-text').innerText = `Resultados para "${query}"`;
+                    if (data.results.length > 0 && page === 1) setupHeroMovie(data.results[0]);
+                    updatePaginationUI(page);
+                }
+            } catch (error) { console.error("Erro na busca:", error); }
+        }
+
+        function setupHeroMovie(movie) {
+            const backdrop = movie.backdrop_path ? TMDB_BACKDROP_BASE + movie.backdrop_path : 'https://image.tmdb.org/t/p/original/rOMLLucpZ2y62Q31D56p3g2t0p7.jpg';
+            document.getElementById('hero-section').style.backgroundImage = `url('${backdrop}')`;
+            document.getElementById('hero-title').innerText = movie.title || movie.name;
+            document.getElementById('hero-overview').innerText = movie.overview || 'Sinopse indisponível.';
+            document.getElementById('hero-rating-val').innerText = movie.vote_average ? movie.vote_average.toFixed(1) : '8.0';
+            document.getElementById('hero-year').innerText = movie.release_date ? movie.release_date.substring(0, 4) : '2026';
+
+            document.getElementById('hero-play-btn').onclick = () => playMovie(movie.id, movie.title || movie.name);
+            document.getElementById('hero-details-btn').onclick = () => openMovieDetails(movie.id);
+        }
+
+        function renderMoviesGrid(movies) {
+            const grid = document.getElementById('movies-grid');
+            grid.innerHTML = '';
+            movies.forEach(movie => {
+                const poster = movie.poster_path ? TMDB_IMG_BASE + movie.poster_path : 'https://placehold.co/500x750/141414/E50914?text=CineFlix';
+                const title = movie.title || movie.name || 'Filme';
+                const rating = movie.vote_average ? movie.vote_average.toFixed(1) : '7.5';
+                const year = movie.release_date ? movie.release_date.substring(0, 4) : '2026';
+
+                const card = document.createElement('div');
+                card.className = 'movie-card bg-netflix-gray rounded-xl overflow-hidden shadow-lg cursor-pointer flex flex-col border border-gray-800 relative group';
+                card.innerHTML = `
+                    <div class="relative aspect-[2/3] overflow-hidden bg-black">
+                        <img src="${poster}" alt="${title}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500" onerror="this.src='https://placehold.co/500x750/141414/E50914?text=CineFlix'">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <button class="bg-netflix-red text-white w-12 h-12 rounded-full flex items-center justify-center shadow-lg"><i class="fa-solid fa-play ml-0.5"></i></button>
+                        </div>
+                        <span class="absolute top-2 right-2 bg-black/70 text-yellow-400 text-xs font-bold px-2 py-1 rounded flex items-center space-x-1"><i class="fa-solid fa-star text-[10px]"></i><span>${rating}</span></span>
+                    </div>
+                    <div class="p-4 flex flex-col flex-1 justify-between bg-netflix-gray">
+                        <h4 class="font-bold text-white text-sm md:text-base line-clamp-1">${title}</h4>
+                        <div class="flex items-center justify-between text-xs text-gray-400 mt-2"><span>${year}</span><span class="uppercase text-[10px] bg-gray-800 px-2 py-0.5 rounded text-gray-300">Filme</span></div>
+                    </div>
+                `;
+                card.addEventListener('click', () => openMovieDetails(movie.id));
+                grid.appendChild(card);
+            });
+        }
+
+        function changePage(direction) {
+            currentPage += direction;
+            if (currentPage < 1) currentPage = 1;
+            if (currentQuery) searchMovies(currentQuery, currentPage);
+            else fetchMovies(currentTab, currentPage);
+            window.scrollTo({ top: document.getElementById('catalog').offsetTop - 100, behavior: 'smooth' });
+        }
+
+        function updatePaginationUI(page) {
+            document.getElementById('page-indicator').innerText = `Página ${page}`;
+            document.getElementById('prev-page-btn').disabled = (page === 1);
+        }
+
+        function playMovie(tmdbId, title) {
+            const playerSection = document.getElementById('player-section');
+            document.getElementById('embed-iframe').src = `https://myembed.biz/filme/${tmdbId}`;
+            document.getElementById('player-movie-title').innerText = title;
+            playerSection.classList.remove('hidden');
+            playerSection.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function closePlayer() {
+            document.getElementById('embed-iframe').src = '';
+            document.getElementById('player-section').classList.add('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        async function openMovieDetails(tmdbId) {
+            try {
+                const response = await fetch(`${TMDB_BASE_URL}/movie/${tmdbId}?api_key=${TMDB_API_KEY}&language=pt-BR`);
+                const movie = await response.json();
+                document.getElementById('modal-poster').src = movie.poster_path ? TMDB_IMG_BASE + movie.poster_path : '';
+                document.getElementById('modal-title').innerText = movie.title || movie.name;
+                document.getElementById('modal-rating-val').innerText = movie.vote_average ? movie.vote_average.toFixed(1) : '8.0';
+                document.getElementById('modal-year').innerText = movie.release_date ? movie.release_date.substring(0, 4) : '2026';
+                document.getElementById('modal-overview').innerText = movie.overview || 'Sinopse indisponível.';
+                document.getElementById('modal-genres').innerText = movie.genres ? movie.genres.map(g => g.name).join(', ') : 'Filme';
+                
+                document.getElementById('modal-play-btn').onclick = () => {
+                    closeMovieDetails();
+                    playMovie(movie.id, movie.title || movie.name);
+                };
+                document.getElementById('details-modal').classList.remove('hidden');
+            } catch (error) { console.error("Erro detalhes:", error); }
+        }
+
+        function closeMovieDetails() { document.getElementById('details-modal').classList.add('hidden'); }
+    </script>
+</body>
+</html>
